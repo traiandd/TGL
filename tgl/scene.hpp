@@ -38,7 +38,7 @@ namespace tgl {
 class Scene {
   public:
 	Scene();
-	Scene(SceneId id) : id_(id) {};
+	Scene(SceneId id) : id_(id), m_data(id) {};
 	Scene(const Scene &) = delete; // prevent copy
 	Scene &operator=(const Scene &) = delete;
 	Scene(Scene &&);
@@ -94,6 +94,7 @@ class Scene {
 	SceneId GetId() const { return id_; }
 	void SetId(SceneId id) {
 		id_ = id;
+		m_data.SetSceneId(id);
 		std::cout << "set id to " << id << "\n";
 	}
 

@@ -4,3 +4,4 @@ build*
 /**/obj
 .vscode/
 .cache/
+compile_commands.json

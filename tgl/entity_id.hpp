@@ -4,8 +4,11 @@
 #include <cstdint>
 
 namespace tgl {
+
+typedef uint32_t LocalEntityId;
+
 struct EntityId {
-	uint32_t id;
+	LocalEntityId id;
 	SceneId scene_id;
 
 	bool operator==(const EntityId &other) const { return id == other.id && scene_id == other.scene_id; }

@@ -252,3 +252,40 @@ foreach (dir IN ITEMS "assets")
         )
     endif()
 endforeach()
+
+
+# ---------------------------------------------------------------------------
+# Tests and benchmarks
+#
+# These are separate, small executables that only compile the tgl/ sources
+# they actually need (currently just component_data.cpp) instead of reusing
+# TGL_SOURCES, so they build fast and don't require a live window/OpenGL
+# context. Note tgl/component_data.hpp's ForEach: it constructs a
+# tgl::Archetype<T>, whose constructor validates through
+# EntityInstance::GetScene() -> GameManager::Get() -> World -> a real
+# window, so ForEach isn't exercised here - only Add/Remove/Get/size, which
+# don't need that.
+# ---------------------------------------------------------------------------
+option(TGL_BUILD_TESTS "Build the tgl unit tests" ON)
+option(TGL_BUILD_BENCHMARKS "Build the tgl benchmarks" ON)
+
+if (TGL_BUILD_TESTS)
+    add_executable(tgl_tests
+        ${TGL_ROOT_DIR}/tgl/component_data.cpp
+        ${TGL_ROOT_DIR}/tests/component_data_tests.cpp
+    )
+    target_include_directories(tgl_tests PRIVATE ${TGL_INCLUDE_DIRS_PRIVATE})
+    target_compile_definitions(tgl_tests PRIVATE ${TGL_CXX_DEFS})
+
+    enable_testing()
+    add_test(NAME tgl_tests COMMAND tgl_tests)
+endif()
+
+if (TGL_BUILD_BENCHMARKS)
+    add_executable(tgl_bench
+        ${TGL_ROOT_DIR}/tgl/component_data.cpp
+        ${TGL_ROOT_DIR}/bench/component_data_bench.cpp
+    )
+    target_include_directories(tgl_bench PRIVATE ${TGL_INCLUDE_DIRS_PRIVATE})
+    target_compile_definitions(tgl_bench PRIVATE ${TGL_CXX_DEFS})
+endif()

@@ -1,8 +1,8 @@
 #pragma once
 
+#include <algorithm>
 #include <functional>
-#include <map>
-#include <iostream>
+#include <vector>
 
 template<typename T> class Observer;
 
@@ -21,16 +21,16 @@ template<typename T> class Observer {
 		}
 	}
 	void Update(T new_value) {
-		value = new_value;
+		value = std::move(new_value);
 		Update();
 	}
 	void Update(std::function<T(T &&)> map) {
-		value = map(std::move(value));
+		value = std::move(map(std::move(value)));
 		Update();
 	}
 	ObserverHandler<T> Subscribe(std::function<void(const T &)> new_sub) {
 		size_t id = next_id++;
-		subscribers[id] = new_sub;
+		subscribers.emplace_back(id, std::move(new_sub));
 		return ObserverHandler{this, id};
 	}
 	void Unsubscribe(ObserverHandler<T> &&handler) {
@@ -38,12 +38,17 @@ template<typename T> class Observer {
 		if (handler.observer != this)
 			return;
 
-		subscribers.erase(handler.id);
+		auto it = std::find_if(subscribers.begin(), subscribers.end(), [&](const auto &entry) { return entry.first == handler.id; });
+		if (it == subscribers.end())
+			return;
+
+		*it = std::move(subscribers.back());
+		subscribers.pop_back();
 	}
 	const T &Get() const { return value; }
 
   private:
 	T value;
 	size_t next_id = 0;
-	std::map<size_t, std::function<void(const T &)>> subscribers;
+	std::vector<std::pair<size_t, std::function<void(const T &)>>> subscribers;
 };
