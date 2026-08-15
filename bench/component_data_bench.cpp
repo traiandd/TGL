@@ -137,7 +137,7 @@ template<typename Data> void RunForEachTwoManual(ankerl::nanobench::Bench &bench
 int main() {
 	{
 		ankerl::nanobench::Bench bench;
-		bench.title("GetComponent across ComponentData implementations").relative(true).batch(kEntities * 3);
+		bench.title("GetComponent across ComponentData implementations").relative(true).batch(kEntities * 3).minEpochIterations(200);
 
 		RunGetComponent<bench_impl::current::ComponentData>(bench, "current (archetype/table storage)");
 		RunGetComponent<bench_impl::dense_array::ComponentData>(bench, "dense_array (TypeId-indexed vector)");

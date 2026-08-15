@@ -60,20 +60,20 @@ Both targets build alongside `TGLDemo` from the same `cmake --build .`; pass `-D
 
 ### Performance
 
-A sample `tgl_bench` run, 10,000 entities, `current` = this repo's archetype/table `ComponentData`:
+A sample `tgl_bench` run (Release build, `-O3 -DNDEBUG`), 10,000 entities, `current` = this repo's archetype/table `ComponentData`:
 
 | Operation                | current (archetype/table) | dense_array (`TypeId`-indexed vector) | legacy (`type_index` hashmap) |
 | ------------------------ | -------------------------: | -------------------------------------: | ------------------------------: |
-| `GetComponent`           |                   20.99 ns |                                33.66 ns |                         67.42 ns |
-| `AddComponent`           |                  240.72 ns |                                82.66 ns |                        173.97 ns |
-| `ForEach<T>`              |                  135.32 ns |                               111.58 ns |                        124.46 ns |
-| `ForEach<T, U>`           |                  188.18 ns |                              194.40 ns* |                       254.40 ns* |
+| `GetComponent`           |                    0.89 ns |                                 0.95 ns |                          6.41 ns |
+| `AddComponent`           |                   12.74 ns |                                 4.15 ns |                         21.07 ns |
+| `ForEach<T>`              |                    5.03 ns |                                 4.97 ns |                          5.11 ns |
+| `ForEach<T, U>`           |                    8.77 ns |                                7.72 ns* |                        15.52 ns* |
 
 \* `dense_array`/`legacy` have no native multi-component query; this is `ForEach<T>` plus a manual has-check for `U` on every row — the fallback either would need without archetype storage.
 
-`current` wins outright on `GetComponent` and on the two-component `ForEach`: a real archetype table only ever visits rows that structurally have every queried component, with no per-row presence check, unlike the manual `ForEach<T>` + has-check the other two fall back to. `AddComponent` is the one place `current` pays a real, expected cost — adding components to a fresh entity one at a time causes a full table transition per call, each relocating every component added so far. That's the standard archetype-ECS trade (cheap, cache-friendly iteration; costlier structural changes) rather than a bug; see [flecs' own docs](https://www.flecs.dev/flecs/md_docs_2FAQ.html) for the same trade-off in a mature engine. Single-component `ForEach` is close to a wash across all three, since a single-component query can't exploit an archetype table's main advantage — skipping presence checks across *multiple* components at once.
+`current` and `dense_array` are essentially tied on `GetComponent` and single-component `ForEach` — both boil down to simple, fully-inlinable dense-array indexing, while `legacy`'s real hashmap lookup costs several times more either way. `AddComponent` shows the expected shape: `dense_array` is fastest since adding a component never touches any other component's storage, `current` pays a real cost for its per-call archetype table transition (relocating every component the entity already has), but still comes in well ahead of `legacy`'s hashmap-based dispatch. On the two-component `ForEach`, `current`'s native archetype query and `dense_array`'s manual has-check land close together — the clear, consistent gap is against `legacy`, which pays roughly double either of them for having no way to skip per-row lookups at all. The `current`-vs-`dense_array` margins move around a bit run to run (close enough to be noise); the stable signal across runs is `current` beating `legacy`'s hashmap cost everywhere, and paying a real, structural premium specifically on `AddComponent` for its table-transition design — the standard archetype-ECS trade (cheap, cache-friendly iteration; costlier structural changes), the same one [flecs' own docs](https://www.flecs.dev/flecs/md_docs_2FAQ.html) describe in a mature engine.
 
-These numbers came from a Debug build on a laptop with CPU frequency scaling and turbo enabled — nanobench itself flags that as an unstable measurement environment. Treat them as directional (which implementation wins, and roughly by how much), not as precise absolutes; run `./tgl_bench` yourself, ideally as a Release build with the CPU governor set to `performance`, for numbers that reflect your machine.
+Measured with `tgl_bench` built in Release; the `GetComponent` block also raises nanobench's `minEpochIterations` to get a stable reading on an operation fast enough that the default settings flagged it as unreliable (see `bench/component_data_bench.cpp`). Still run on a laptop with CPU frequency scaling and turbo enabled, so treat absolute values as approximate — run `./tgl_bench` yourself (see Testing above for how to configure a Release build) for numbers specific to your machine.
 
 ## License
 
