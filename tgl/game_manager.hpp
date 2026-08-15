@@ -1,6 +1,5 @@
 #pragma once
 
-#include <memory>
 #include <string>
 #include <unordered_map>
 
@@ -9,7 +8,7 @@
 #include "core/gpu/shader.h"
 #include "glm/fwd.hpp"
 
-typedef uint16_t SceneId;
+#include "tgl/scene_manager.hpp"
 
 namespace tgl {
 
@@ -26,12 +25,14 @@ class GameManager : public World {
 	static GameManager &Get();
 	std::unordered_map<std::string, Shader *> shaders;
 
-	SceneId AddScene(Scene &&s);
-	void SetScene(SceneId id, Scene &&s);
-	Scene *GetScene(SceneId id);
-	void SetActiveScene(SceneId name);
-	Scene *GetActiveScene() const;
-	SceneId GetNewSceneId();
+	// Thin forwarding to SceneManager, kept so existing call sites (and the
+	// Init/frame-loop/input code below) don't need to know it moved.
+	SceneId AddScene(Scene &&s) { return SceneManager::Get().AddScene(std::move(s)); }
+	void SetScene(SceneId id, Scene &&s) { SceneManager::Get().SetScene(id, std::move(s)); }
+	Scene *GetScene(SceneId id) { return SceneManager::Get().GetScene(id); }
+	void SetActiveScene(SceneId id) { SceneManager::Get().SetActiveScene(id); }
+	Scene *GetActiveScene() const { return SceneManager::Get().GetActiveScene(); }
+	SceneId GetNewSceneId() { return SceneManager::Get().GetNewSceneId(); }
 
   private:
 	void FrameStart() override;
@@ -47,9 +48,5 @@ class GameManager : public World {
 	void OnMouseBtnPress(int mouseX, int mouseY, int button, int mods) override;
 	void OnMouseBtnRelease(int mouseX, int mouseY, int button, int mods) override;
 	void OnMouseScroll(int mouseX, int mouseY, int offsetX, int offsetY) override;
-
-	SceneId current_scene_id_ = 1;
-	std::unordered_map<SceneId, std::unique_ptr<Scene>> scenes_;
-	Scene *active_scene_ = nullptr;
 };
 } // namespace tgl

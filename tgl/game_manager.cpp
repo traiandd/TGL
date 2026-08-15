@@ -53,60 +53,37 @@ void GameManager::FrameStart() {
 }
 
 void GameManager::Update(float deltaTimeSeconds) {
-	active_scene_->OnUpdate().Update(deltaTimeSeconds);
+	Scene *active_scene = SceneManager::Get().GetActiveScene();
+	active_scene->OnUpdate().Update(deltaTimeSeconds);
 
-	active_scene_->FlushDeleteQueue();
+	active_scene->FlushDeleteQueue();
 }
 
 void GameManager::FrameEnd() {}
 
 void GameManager::DrawScene(glm::mat3 visMatrix) {}
 
-void GameManager::OnInputUpdate(float deltaTime, int mods) { active_scene_->OnInputUpdate().Update({mods, deltaTime, window, active_scene_}); }
+void GameManager::OnInputUpdate(float deltaTime, int mods) {
+	Scene *active_scene = SceneManager::Get().GetActiveScene();
+	active_scene->OnInputUpdate().Update({mods, deltaTime, window, active_scene});
+}
 
 void GameManager::OnKeyPress(int key, int mods) {}
 
 void GameManager::OnKeyRelease(int key, int mods) {}
 
-void GameManager::OnMouseMove(int mouseX, int mouseY, int deltaX, int deltaY) { active_scene_->OnMouseMove().Update({mouseX, mouseY, deltaX, deltaY}); }
+void GameManager::OnMouseMove(int mouseX, int mouseY, int deltaX, int deltaY) {
+	SceneManager::Get().GetActiveScene()->OnMouseMove().Update({mouseX, mouseY, deltaX, deltaY});
+}
 
 void GameManager::OnMouseBtnPress(int mouseX, int mouseY, int button, int mods) {
 	MouseClickEvent event = {glm::vec2(mouseX, mouseY), button, mods};
-	active_scene_->OnMouseDown().Update(event);
+	SceneManager::Get().GetActiveScene()->OnMouseDown().Update(event);
 }
 
 void GameManager::OnMouseBtnRelease(int mouseX, int mouseY, int button, int mods) {
 	MouseClickEvent event = {glm::vec2(mouseX, mouseY), button, mods};
-	active_scene_->OnMouseUp().Update(event);
+	SceneManager::Get().GetActiveScene()->OnMouseUp().Update(event);
 }
 
 void GameManager::OnMouseScroll(int mouseX, int mouseY, int offsetX, int offsetY) {}
-
-SceneId tgl::GameManager::AddScene(Scene &&s) {
-	cout << "Adding scene " << s.GetId() << "\n";
-	if (s.GetId() == 0) {
-		s.SetId(current_scene_id_);
-		scenes_[current_scene_id_] = make_unique<Scene>(std::move(s));
-		return current_scene_id_++;
-	} else {
-		scenes_[s.GetId()] = make_unique<Scene>(std::move(s));
-		return s.GetId();
-	}
-}
-
-void tgl::GameManager::SetScene(SceneId id, Scene &&s) { scenes_[id] = make_unique<Scene>(std::move(s)); }
-
-Scene *tgl::GameManager::GetScene(SceneId id) { return scenes_[id].get(); }
-
-Scene *tgl::GameManager::GetActiveScene() const { return active_scene_; }
-
-SceneId tgl::GameManager::GetNewSceneId() { return current_scene_id_++; }
-
-void tgl::GameManager::SetActiveScene(SceneId name) {
-	if (scenes_.count(name)) {
-		active_scene_ = scenes_[name].get();
-	} else {
-		// cout << std::format("WARN: no scene with name {}. Silently
-		// failing...", name);
-	}
-}

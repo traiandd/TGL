@@ -6,7 +6,6 @@
 
 #include "entity_id.hpp"
 #include "glm/fwd.hpp"
-#include "tgl/game_manager.hpp"
 
 namespace tgl {
 

@@ -7,12 +7,15 @@
 // wired into the engine, and intentionally not updated to track further
 // engine changes.
 //
-// ForEach/GetComponentHandle are dropped from this snapshot: both need
-// tgl::Archetype<T>/tgl::ComponentHandle<T>, whose construction chains
-// through EntityInstance::GetScene() -> GameManager::Get() -> a real
-// window, which isn't available in the benchmark binary - same constraint
-// the current implementation's benchmark is under.
+// ForEach builds a tgl::Archetype<T>, whose constructor validates through
+// EntityInstance::GetScene() -> SceneManager::Get() - so it only resolves
+// correctly if a real tgl::Scene with matching EntityIds/components has
+// also been registered via SceneManager (this legacy ComponentData's own
+// storage is disconnected from the real Scene, so it's not what Archetype
+// validates against). See bench/component_data_bench.cpp's ForEach
+// benchmark for how that's set up.
 
+#include "tgl/archetype.hpp"
 #include "tgl/entity_id.hpp"
 
 #include <memory>
@@ -49,6 +52,12 @@ template<typename T> class ComponentStorage : public IComponentStorage {
 
 	T *Get(tgl::EntityId e) { return (e.id < hasComponent.size() && hasComponent[e.id] && components[e.id].has_value()) ? &*components[e.id] : nullptr; }
 
+	template<typename Func> void ForEach(Func f) {
+		for (uint32_t e = 0; e < components.size(); e++)
+			if (hasComponent[e] && components[e])
+				f(tgl::Archetype<T>(tgl::EntityId(e, hasComponent[e])));
+	}
+
   private:
 	std::vector<std::optional<T>> components;
 	std::vector<SceneId> hasComponent;
@@ -80,6 +89,8 @@ class ComponentData {
 		}
 		return nullptr;
 	}
+
+	template<typename T, typename Func> void ForEach(Func f) { return GetOrCreateStorage<T>().ForEach(f); }
 
 	size_t size() { return componentStores.size(); }
 

@@ -6,7 +6,6 @@
 #include <memory>
 #include "component/component.hpp"
 #include "tgl/component_data.hpp"
-#include "tgl/game_manager.hpp"
 #include "entity_id.hpp"
 
 namespace tgl {

@@ -1,13 +1,19 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest/doctest.h"
 
+#include "tgl/archetype.hpp"
 #include "tgl/component_data.hpp"
+#include "tgl/scene.hpp"
+#include "tgl/scene_manager.hpp"
 
-// NOTE: ComponentData::ForEach (and ComponentStorage::ForEach) build a
-// tgl::Archetype<T>, whose constructor validates through
-// EntityInstance::GetScene() -> GameManager::Get() -> World -> a real
-// window. That's not available in a plain test binary, so these tests only
-// cover Add/Remove/Get/size, which don't touch that path.
+#include <vector>
+
+// ForEach builds a tgl::Archetype<T>, whose constructor validates through
+// EntityInstance::GetScene() -> SceneManager::Get(), so the ForEach tests
+// below register a real Scene through SceneManager first (see
+// tests/scene_entity_tests.cpp for the same pattern at the Scene/entity
+// level). Add/Remove/Get/size don't need that - they work on a bare
+// ComponentData with fabricated EntityIds.
 
 using tgl::EntityId;
 
@@ -20,6 +26,15 @@ struct Velocity {
 	float dx = 0, dy = 0;
 };
 } // namespace
+
+// Archetype<T> requires an ArchetypeExtender<T, Derived> specialization for
+// every component type it's instantiated with (see tgl/archetype.hpp) -
+// real components provide one to forward behavior (SetPosition etc.); these
+// test-only types just need an empty one to be usable in Archetype<T>.
+namespace tgl {
+template<typename Derived> class ArchetypeExtender<Position, Derived> {};
+template<typename Derived> class ArchetypeExtender<Velocity, Derived> {};
+} // namespace tgl
 
 TEST_CASE("ComponentStorage stores and retrieves by local id") {
 	ComponentStorage<Position> storage;
@@ -120,4 +135,58 @@ TEST_CASE("ComponentData::RemoveComponent on a type never added is a no-op") {
 	EntityId e{0, 1};
 	data.RemoveComponent<Position>(e);
 	CHECK(data.GetComponent<Position>(e) == nullptr);
+}
+
+TEST_CASE("ComponentData::ForEach visits every entity with the component, and no others") {
+	SceneId scene_id = tgl::SceneManager::Get().AddScene(tgl::Scene());
+	tgl::Scene *scene = tgl::SceneManager::Get().GetScene(scene_id);
+	auto &data = scene->GetComponentData();
+
+	EntityId with_position{0, scene_id};
+	EntityId with_velocity{1, scene_id};
+	data.AddComponent(with_position, Position{1, 2});
+	data.AddComponent(with_velocity, Velocity{3, 4});
+
+	std::vector<tgl::LocalEntityId> visited;
+	data.ForEach<Position>([&](tgl::Archetype<Position> entity) { visited.push_back(entity.instance_.GetId().id); });
+
+	REQUIRE(visited.size() == 1);
+	CHECK(visited[0] == with_position.id);
+}
+
+TEST_CASE("ComponentData::ForEach skips entities whose component was removed") {
+	SceneId scene_id = tgl::SceneManager::Get().AddScene(tgl::Scene());
+	tgl::Scene *scene = tgl::SceneManager::Get().GetScene(scene_id);
+	auto &data = scene->GetComponentData();
+
+	EntityId e0{0, scene_id};
+	EntityId e1{1, scene_id};
+	data.AddComponent(e0, Position{1, 2});
+	data.AddComponent(e1, Position{3, 4});
+	data.RemoveComponent<Position>(e0);
+
+	int count = 0;
+	data.ForEach<Position>([&](tgl::Archetype<Position> entity) {
+		count++;
+		CHECK(entity.instance_.GetId().id == e1.id);
+	});
+	CHECK(count == 1);
+}
+
+TEST_CASE("ComponentData::ForEach's Archetype exposes the actual component value") {
+	SceneId scene_id = tgl::SceneManager::Get().AddScene(tgl::Scene());
+	tgl::Scene *scene = tgl::SceneManager::Get().GetScene(scene_id);
+	auto &data = scene->GetComponentData();
+
+	EntityId e{0, scene_id};
+	data.AddComponent(e, Position{7, 8});
+
+	int visits = 0;
+	data.ForEach<Position>([&](tgl::Archetype<Position> entity) {
+		visits++;
+		REQUIRE(entity.Get<Position>() != nullptr);
+		CHECK(entity.Get<Position>()->x == 7);
+		CHECK(entity.Get<Position>()->y == 8);
+	});
+	CHECK(visits == 1);
 }

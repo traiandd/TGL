@@ -272,7 +272,11 @@ option(TGL_BUILD_BENCHMARKS "Build the tgl benchmarks" ON)
 if (TGL_BUILD_TESTS)
     add_executable(tgl_tests
         ${TGL_ROOT_DIR}/tgl/component_data.cpp
+        ${TGL_ROOT_DIR}/tgl/entity.cpp
+        ${TGL_ROOT_DIR}/tgl/scene.cpp
+        ${TGL_ROOT_DIR}/tgl/scene_manager.cpp
         ${TGL_ROOT_DIR}/tests/component_data_tests.cpp
+        ${TGL_ROOT_DIR}/tests/scene_entity_tests.cpp
     )
     target_include_directories(tgl_tests PRIVATE ${TGL_INCLUDE_DIRS_PRIVATE})
     target_compile_definitions(tgl_tests PRIVATE ${TGL_CXX_DEFS})
@@ -284,6 +288,9 @@ endif()
 if (TGL_BUILD_BENCHMARKS)
     add_executable(tgl_bench
         ${TGL_ROOT_DIR}/tgl/component_data.cpp
+        ${TGL_ROOT_DIR}/tgl/entity.cpp
+        ${TGL_ROOT_DIR}/tgl/scene.cpp
+        ${TGL_ROOT_DIR}/tgl/scene_manager.cpp
         ${TGL_ROOT_DIR}/bench/component_data_bench.cpp
     )
     target_include_directories(tgl_bench PRIVATE ${TGL_INCLUDE_DIRS_PRIVATE})

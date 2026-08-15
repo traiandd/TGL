@@ -1,7 +1,9 @@
 #pragma once
 
-#include "tgl/game_manager.hpp"
 #include <cstdint>
+#include <functional>
+
+typedef uint16_t SceneId;
 
 namespace tgl {
 
