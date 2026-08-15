@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include <typeindex>
 #include <memory>
+#include <utility>
 #include "component/component.hpp"
 #include "tgl/component_data.hpp"
 #include "entity_id.hpp"
@@ -20,8 +21,8 @@ class EntityInstance {
 	EntityInstance(EntityId id);
 	EntityInstance() : id_({0, 0}) {};
 
-	template<typename T> EntityInstance *Add(const T &component) {
-		GetSceneData().AddComponent(id_, component);
+	template<typename T> EntityInstance *Add(T component) {
+		GetSceneData().AddComponent(id_, std::move(component));
 		return this;
 	}
 	EntityId GetId() const { return id_; }

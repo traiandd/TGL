@@ -56,13 +56,12 @@ template<typename T, typename Derived> class ArchetypeExtender;
 template<typename... Components> class Archetype : public ArchetypeData, public ArchetypeExtender<Components, Archetype<Components...>>... {
   public:
 	explicit Archetype(const EntityInstance instance) : ArchetypeData(instance) {
-		// compile-time list, runtime assertion
-		(..., assert(instance_.Get<Components>() != nullptr));
+		// TODO: TryFrom does the check twice. Maybe remove this instead?
+		assert(instance_.GetSceneData().template HasComponents<Components...>(instance_.GetId()));
 	}
 
 	static std::optional<Archetype<Components...>> TryFrom(const EntityInstance instance) {
-		bool hasAll = (... && (instance.Get<Components>() != nullptr));
-		if (!hasAll)
+		if (!instance.GetSceneData().HasComponents<Components...>(instance.GetId()))
 			return std::nullopt;
 		return Archetype<Components...>(instance);
 	}

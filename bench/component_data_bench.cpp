@@ -2,6 +2,7 @@
 #include "nanobench/nanobench.h"
 
 #include "implementations/current/component_data.hpp"
+#include "implementations/dense_array/component_data.hpp"
 #include "implementations/legacy/component_data.hpp"
 
 #include "tgl/scene.hpp"
@@ -49,6 +50,25 @@ template<typename Data> void Populate(Data &data, SceneId scene_id = 1) {
 	}
 }
 
+// Half the entities get both Position and Velocity, a quarter get only
+// Position, a quarter get only Velocity - for the ForEach<Position, Velocity>
+// benchmark below, which needs a mix of matching/non-matching entities to be
+// a meaningful query rather than a full-table scan.
+template<typename Data> void PopulateMixed(Data &data, SceneId scene_id = 1) {
+	for (int i = 0; i < kEntities; i++) {
+		EntityId e{static_cast<uint32_t>(i), scene_id};
+		int bucket = i % 4;
+		if (bucket < 2) {
+			data.AddComponent(e, Position{1, 2, 3});
+			data.AddComponent(e, Velocity{0.1f, 0.2f, 0.3f});
+		} else if (bucket == 2) {
+			data.AddComponent(e, Position{1, 2, 3});
+		} else {
+			data.AddComponent(e, Velocity{0.1f, 0.2f, 0.3f});
+		}
+	}
+}
+
 template<typename Data> void RunGetComponent(ankerl::nanobench::Bench &bench, const char *name) {
 	Data data;
 	Populate(data);
@@ -83,6 +103,33 @@ template<typename Data> void RunForEach(ankerl::nanobench::Bench &bench, const c
 	});
 }
 
+// current has real multi-component archetype queries: this visits only the
+// table(s) whose signature contains both Position and Velocity.
+template<typename Data> void RunForEachTwoNative(ankerl::nanobench::Bench &bench, const char *name, Data &data) {
+	bench.run(name, [&] {
+		float sum = 0;
+		data.template ForEach<Position, Velocity>([&](tgl::Archetype<Position, Velocity> entity) { sum += entity.Get<Position>()->x + entity.Get<Velocity>()->dx; });
+		ankerl::nanobench::doNotOptimizeAway(sum);
+	});
+}
+
+// dense_array/legacy have no multi-component ForEach, so they do what any
+// engine without archetype support has to: ForEach over one component, then
+// a manual per-row has-check for the other. Uses data.GetComponent directly
+// (not Archetype<Velocity>::Get) so it's this implementation's own lookup
+// being timed, not the real Scene's.
+template<typename Data> void RunForEachTwoManual(ankerl::nanobench::Bench &bench, const char *name, Data &data) {
+	bench.run(name, [&] {
+		float sum = 0;
+		data.template ForEach<Position>([&](tgl::Archetype<Position> entity) {
+			tgl::EntityId id = static_cast<tgl::EntityInstance>(entity).GetId();
+			if (Velocity *vel = data.template GetComponent<Velocity>(id))
+				sum += entity.Get<Position>()->x + vel->dx;
+		});
+		ankerl::nanobench::doNotOptimizeAway(sum);
+	});
+}
+
 } // namespace
 
 // Add further implementations under bench/implementations/, include their
@@ -92,7 +139,8 @@ int main() {
 		ankerl::nanobench::Bench bench;
 		bench.title("GetComponent across ComponentData implementations").relative(true).batch(kEntities * 3);
 
-		RunGetComponent<bench_impl::current::ComponentData>(bench, "current (dense vector index)");
+		RunGetComponent<bench_impl::current::ComponentData>(bench, "current (archetype/table storage)");
+		RunGetComponent<bench_impl::dense_array::ComponentData>(bench, "dense_array (TypeId-indexed vector)");
 		RunGetComponent<bench_impl::legacy::ComponentData>(bench, "legacy (type_index hash map)");
 	}
 
@@ -100,21 +148,26 @@ int main() {
 		ankerl::nanobench::Bench bench;
 		bench.title("AddComponent across ComponentData implementations").relative(true).batch(kEntities * 3);
 
-		RunAddComponent<bench_impl::current::ComponentData>(bench, "current (dense vector index)");
+		RunAddComponent<bench_impl::current::ComponentData>(bench, "current (archetype/table storage)");
+		RunAddComponent<bench_impl::dense_array::ComponentData>(bench, "dense_array (TypeId-indexed vector)");
 		RunAddComponent<bench_impl::legacy::ComponentData>(bench, "legacy (type_index hash map)");
 	}
 
 	{
 		// current benchmarks directly against a real, registered Scene's
-		// ComponentData. legacy gets its own separate storage populated
-		// with the same EntityIds/scene_id, purely so Archetype<T>'s
-		// validation (which always resolves through the real Scene above)
-		// succeeds for it too - see RunForEach's comment.
+		// ComponentData. dense_array/legacy each get their own separate
+		// storage populated with the same EntityIds/scene_id, purely so
+		// Archetype<T>'s validation (which always resolves through the real
+		// Scene above) succeeds for them too - see RunForEach's comment.
 		SceneId scene_id = tgl::SceneManager::Get().AddScene(tgl::Scene());
 		tgl::Scene *scene = tgl::SceneManager::Get().GetScene(scene_id);
 
 		auto &current_data = scene->GetComponentData();
 		Populate(current_data, scene_id);
+
+		bench_impl::dense_array::ComponentData dense_array_data;
+		dense_array_data.SetSceneId(scene_id); // ForEach reconstructs EntityIds from this, unlike legacy which stores scene_id per-slot
+		Populate(dense_array_data, scene_id);
 
 		bench_impl::legacy::ComponentData legacy_data;
 		Populate(legacy_data, scene_id);
@@ -122,7 +175,35 @@ int main() {
 		ankerl::nanobench::Bench bench;
 		bench.title("ForEach across ComponentData implementations").relative(true).batch(kEntities);
 
-		RunForEach(bench, "current (dense vector index)", current_data);
+		RunForEach(bench, "current (archetype/table storage)", current_data);
+		RunForEach(bench, "dense_array (TypeId-indexed vector)", dense_array_data);
 		RunForEach(bench, "legacy (type_index hash map)", legacy_data);
+	}
+
+	{
+		// Same trick as the single-component ForEach block above: dense_array/
+		// legacy get their own storage populated with matching EntityIds/
+		// scene_id purely so Archetype<T>::Get resolves - see RunForEach's
+		// comment. Distribution: 50% of entities have both Position and
+		// Velocity, 25% have only Position, 25% have only Velocity.
+		SceneId scene_id = tgl::SceneManager::Get().AddScene(tgl::Scene());
+		tgl::Scene *scene = tgl::SceneManager::Get().GetScene(scene_id);
+
+		auto &current_data = scene->GetComponentData();
+		PopulateMixed(current_data, scene_id);
+
+		bench_impl::dense_array::ComponentData dense_array_data;
+		dense_array_data.SetSceneId(scene_id);
+		PopulateMixed(dense_array_data, scene_id);
+
+		bench_impl::legacy::ComponentData legacy_data;
+		PopulateMixed(legacy_data, scene_id);
+
+		ankerl::nanobench::Bench bench;
+		bench.title("ForEach<Position, Velocity> across ComponentData implementations").relative(true).batch(kEntities / 2);
+
+		RunForEachTwoNative(bench, "current (native 2-component archetype query)", current_data);
+		RunForEachTwoManual(bench, "dense_array (ForEach<Position> + manual has-check)", dense_array_data);
+		RunForEachTwoManual(bench, "legacy (ForEach<Position> + manual has-check)", legacy_data);
 	}
 }
