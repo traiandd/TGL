@@ -53,6 +53,17 @@ class ArchetypeData {
 
 template<typename T, typename Derived> class ArchetypeExtender;
 
+namespace archetype_detail {
+template<typename T, typename... Pack> constexpr bool kIsOneOf = (std::is_same_v<T, Pack> || ...);
+
+// ComponentSet<A...>::kEquals<B...> - true iff A... and B... contain the
+// same set of types, regardless of order (and assuming neither pack repeats
+// a type, which Archetype's own component packs never do).
+template<typename... A> struct ComponentSet {
+	template<typename... B> static constexpr bool kEquals = sizeof...(A) == sizeof...(B) && (kIsOneOf<A, B...> && ...);
+};
+} // namespace archetype_detail
+
 template<typename... Components> class Archetype : public ArchetypeData, public ArchetypeExtender<Components, Archetype<Components...>>... {
   public:
 	explicit Archetype(const EntityInstance instance) : ArchetypeData(instance) {
@@ -60,14 +71,25 @@ template<typename... Components> class Archetype : public ArchetypeData, public 
 		assert(instance_.GetSceneData().template HasComponents<Components...>(instance_.GetId()));
 	}
 
+	// Reorders another Archetype over the exact same component set - the two
+	// only ever differ in Archetype<...>'s type identity (template argument
+	// order), never in what they actually guarantee. Constrained so this
+	// never silently accepts an unrelated component set; delegates to the
+	// EntityInstance constructor above, which re-validates via HasComponents
+	// regardless of what the source Archetype already proved.
+	template<typename... OtherComponents>
+		requires archetype_detail::ComponentSet<Components...>::template
+	kEquals<OtherComponents...> explicit Archetype(const Archetype<OtherComponents...> &other) : Archetype(static_cast<EntityInstance>(other)) {}
+
 	static std::optional<Archetype<Components...>> TryFrom(const EntityInstance instance) {
 		if (!instance.GetSceneData().HasComponents<Components...>(instance.GetId()))
 			return std::nullopt;
 		return Archetype<Components...>(instance);
 	}
 
-	template<typename T> T *Get() const {
-		static_assert((std::is_same_v<T, Components> || ...), "This entity is not guaranteed to have this component");
+	template<typename T>
+		requires archetype_detail::kIsOneOf<T, Components...>
+	T *Get() const {
 		return instance_.Get<T>();
 	}
 	operator EntityInstance() const { return instance_; }
