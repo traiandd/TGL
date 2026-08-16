@@ -159,8 +159,8 @@ int main() {
 		// storage populated with the same EntityIds/scene_id, purely so
 		// Archetype<T>'s validation (which always resolves through the real
 		// Scene above) succeeds for them too - see RunForEach's comment.
-		SceneId scene_id = tgl::SceneManager::Get().AddScene(tgl::Scene());
-		tgl::Scene *scene = tgl::SceneManager::Get().GetScene(scene_id);
+		tgl::Scene *scene = &tgl::SceneManager::Get().NewScene();
+		SceneId scene_id = scene->GetId();
 
 		auto &current_data = scene->GetComponentData();
 		Populate(current_data, scene_id);
@@ -186,8 +186,8 @@ int main() {
 		// scene_id purely so Archetype<T>::Get resolves - see RunForEach's
 		// comment. Distribution: 50% of entities have both Position and
 		// Velocity, 25% have only Position, 25% have only Velocity.
-		SceneId scene_id = tgl::SceneManager::Get().AddScene(tgl::Scene());
-		tgl::Scene *scene = tgl::SceneManager::Get().GetScene(scene_id);
+		tgl::Scene *scene = &tgl::SceneManager::Get().NewScene();
+		SceneId scene_id = scene->GetId();
 
 		auto &current_data = scene->GetComponentData();
 		PopulateMixed(current_data, scene_id);

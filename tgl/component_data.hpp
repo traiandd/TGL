@@ -14,7 +14,6 @@
 namespace tgl {
 
 class EntityInstance;
-template<typename T> class ComponentHandle;
 template<typename... Components> class Archetype;
 }; // namespace tgl
 
@@ -250,9 +249,6 @@ class ComponentData {
 		Column<T> *col = rec.table->template GetColumn<T>();
 		return col ? col->Get(rec.row) : nullptr;
 	}
-
-	// would component handles be needed?
-	template<typename T> std::optional<tgl::ComponentHandle<T>> GetComponentHandle(tgl::EntityId e) { return tgl::ComponentHandle<T>::TryCreate(e, this); }
 
 	// Whether e's archetype table contains ALL of Components - a single
 	// bitset comparison against the table's own signature, regardless of how

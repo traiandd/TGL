@@ -6,7 +6,6 @@
 #include "glm/glm.hpp"
 #include "glm/gtx/euler_angles.hpp"
 #include "register_component.hpp"
-#include "component_handle.hpp"
 #include "tgl/entity.hpp"
 #include "parent.hpp"
 #include "tgl/archetype.hpp"

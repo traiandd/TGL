@@ -6,7 +6,6 @@
 #include "system/system.hpp"
 #include "tgl/component/register_component.hpp"
 #include "tgl/entity_id.hpp"
-#include "tgl/game_manager.hpp"
 #include "tgl/observer.hpp"
 #include "tgl/prefab/camera_3d.hpp"
 

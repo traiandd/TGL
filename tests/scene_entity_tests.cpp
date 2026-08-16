@@ -18,9 +18,7 @@ register_component(Position);
 } // namespace
 
 TEST_CASE("EntityInstance resolves its own scene through SceneManager without a window") {
-	SceneId id = tgl::SceneManager::Get().AddScene(tgl::Scene());
-	tgl::Scene *scene = tgl::SceneManager::Get().GetScene(id);
-	REQUIRE(scene != nullptr);
+	tgl::Scene *scene = &tgl::SceneManager::Get().NewScene();
 
 	tgl::Entity e;
 	e.AddComponent<Position>(Position{{}, 1, 2});
@@ -35,10 +33,8 @@ TEST_CASE("EntityInstance resolves its own scene through SceneManager without a 
 }
 
 TEST_CASE("Entities in different scenes don't see each other's components") {
-	SceneId id_a = tgl::SceneManager::Get().AddScene(tgl::Scene());
-	SceneId id_b = tgl::SceneManager::Get().AddScene(tgl::Scene());
-	tgl::Scene *scene_a = tgl::SceneManager::Get().GetScene(id_a);
-	tgl::Scene *scene_b = tgl::SceneManager::Get().GetScene(id_b);
+	tgl::Scene *scene_a = &tgl::SceneManager::Get().NewScene();
+	tgl::Scene *scene_b = &tgl::SceneManager::Get().NewScene();
 
 	tgl::Entity e;
 	e.AddComponent<Position>(Position{{}, 9, 9});

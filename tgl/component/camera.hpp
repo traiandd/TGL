@@ -3,6 +3,7 @@
 #include "register_component.hpp"
 #include <cstdint>
 #include "glm/glm.hpp"
+#include "tgl/archetype.hpp"
 #include "tgl/component/2d_transform.hpp"
 
 struct CameraComponent : Component {
@@ -26,11 +27,14 @@ struct CameraComponent : Component {
 
 register_component(CameraComponent);
 
-template<> class tgl::ComponentHandle<CameraComponent> : public BaseComponentHandle<CameraComponent, tgl::ComponentHandle<CameraComponent>> {
+template<typename Derived> class tgl::ArchetypeExtender<CameraComponent, Derived> {
+	Using(Instance);
+	Using(Self(CameraComponent));
+
   public:
 	glm::vec2 ScreenToWorldCoords(glm::vec2 screen_coords) {
-		auto cam_pos = m_instance.Get<Transform2dComponent>();
-		auto cam_data = m_instance.Get<CameraComponent>();
+		auto cam_pos = Instance().template Get<Transform2dComponent>();
+		auto cam_data = Self();
 
 		glm::vec4 ndc((2.0f * screen_coords.x) / cam_data->GetSizes().x - 1.0f, 1.0f - (2.0f * screen_coords.y) / cam_data->GetSizes().y, 0.0f, 1.0f);
 

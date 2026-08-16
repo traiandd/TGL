@@ -1,6 +1,7 @@
 #include "tgl/scene_manager.hpp"
 
 #include "scene.hpp"
+#include <cassert>
 #include <iostream>
 
 using namespace std;
@@ -11,27 +12,27 @@ SceneManager &tgl::SceneManager::Get() {
 	return instance;
 }
 
-SceneId tgl::SceneManager::AddScene(Scene &&s) {
-	if (s.GetId() == 0) {
-		s.SetId(current_scene_id_);
-		scenes_[current_scene_id_] = make_unique<Scene>(std::move(s));
-		return current_scene_id_++;
-	} else {
-		scenes_[s.GetId()] = make_unique<Scene>(std::move(s));
-		return s.GetId();
-	}
+Scene &tgl::SceneManager::NewScene() {
+	SceneId id = current_scene_id_++;
+	assert(id <= kMaxScenes && "SceneManager: exceeded fixed scene capacity (kMaxScenes)");
+	scenes_[id] = make_unique<Scene>(id);
+	return *scenes_[id];
 }
 
-void tgl::SceneManager::SetScene(SceneId id, Scene &&s) { scenes_[id] = make_unique<Scene>(std::move(s)); }
+void tgl::SceneManager::SetScene(SceneId id, Scene &&s) {
+	assert(id <= kMaxScenes && "SceneManager: exceeded fixed scene capacity (kMaxScenes)");
+	scenes_[id] = make_unique<Scene>(std::move(s));
+}
 
-Scene *tgl::SceneManager::GetScene(SceneId id) { return scenes_[id].get(); }
+Scene *tgl::SceneManager::GetScene(SceneId id) {
+	assert(id < scenes_.size() && "SceneManager: scene id out of range");
+	return scenes_[id].get();
+}
 
 Scene *tgl::SceneManager::GetActiveScene() const { return active_scene_; }
 
-SceneId tgl::SceneManager::GetNewSceneId() { return current_scene_id_++; }
-
 void tgl::SceneManager::SetActiveScene(SceneId id) {
-	if (scenes_.count(id)) {
+	if (id < scenes_.size() && scenes_[id]) {
 		active_scene_ = scenes_[id].get();
 	} else {
 		// cout << std::format("WARN: no scene with id {}. Silently

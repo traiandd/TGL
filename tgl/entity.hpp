@@ -12,8 +12,6 @@
 namespace tgl {
 class Scene;
 
-template<typename T> class ComponentHandle;
-
 template<typename... Components> class Archetype;
 
 class EntityInstance {

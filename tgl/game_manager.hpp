@@ -27,12 +27,11 @@ class GameManager : public World {
 
 	// Thin forwarding to SceneManager, kept so existing call sites (and the
 	// Init/frame-loop/input code below) don't need to know it moved.
-	SceneId AddScene(Scene &&s) { return SceneManager::Get().AddScene(std::move(s)); }
+	Scene &NewScene() { return SceneManager::Get().NewScene(); }
 	void SetScene(SceneId id, Scene &&s) { SceneManager::Get().SetScene(id, std::move(s)); }
 	Scene *GetScene(SceneId id) { return SceneManager::Get().GetScene(id); }
 	void SetActiveScene(SceneId id) { SceneManager::Get().SetActiveScene(id); }
 	Scene *GetActiveScene() const { return SceneManager::Get().GetActiveScene(); }
-	SceneId GetNewSceneId() { return SceneManager::Get().GetNewSceneId(); }
 
   private:
 	void FrameStart() override;

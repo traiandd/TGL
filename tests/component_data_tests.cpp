@@ -161,8 +161,8 @@ TEST_CASE("ComponentData::size reflects the number of distinct archetype tables 
 }
 
 TEST_CASE("ComponentData::ForEach<T> visits every entity with the component, and no others") {
-	SceneId scene_id = tgl::SceneManager::Get().AddScene(tgl::Scene());
-	tgl::Scene *scene = tgl::SceneManager::Get().GetScene(scene_id);
+	tgl::Scene *scene = &tgl::SceneManager::Get().NewScene();
+	SceneId scene_id = scene->GetId();
 	auto &data = scene->GetComponentData();
 
 	EntityId with_position{0, scene_id};
@@ -178,8 +178,8 @@ TEST_CASE("ComponentData::ForEach<T> visits every entity with the component, and
 }
 
 TEST_CASE("ComponentData::ForEach<T> skips entities whose component was removed") {
-	SceneId scene_id = tgl::SceneManager::Get().AddScene(tgl::Scene());
-	tgl::Scene *scene = tgl::SceneManager::Get().GetScene(scene_id);
+	tgl::Scene *scene = &tgl::SceneManager::Get().NewScene();
+	SceneId scene_id = scene->GetId();
 	auto &data = scene->GetComponentData();
 
 	EntityId e0{0, scene_id};
@@ -197,8 +197,8 @@ TEST_CASE("ComponentData::ForEach<T> skips entities whose component was removed"
 }
 
 TEST_CASE("ComponentData::ForEach<T>'s Archetype exposes the actual component value") {
-	SceneId scene_id = tgl::SceneManager::Get().AddScene(tgl::Scene());
-	tgl::Scene *scene = tgl::SceneManager::Get().GetScene(scene_id);
+	tgl::Scene *scene = &tgl::SceneManager::Get().NewScene();
+	SceneId scene_id = scene->GetId();
 	auto &data = scene->GetComponentData();
 
 	EntityId e{0, scene_id};
@@ -215,8 +215,8 @@ TEST_CASE("ComponentData::ForEach<T>'s Archetype exposes the actual component va
 }
 
 TEST_CASE("ComponentData::ForEach<A, B> only visits entities that have both, including ones with a superset") {
-	SceneId scene_id = tgl::SceneManager::Get().AddScene(tgl::Scene());
-	tgl::Scene *scene = tgl::SceneManager::Get().GetScene(scene_id);
+	tgl::Scene *scene = &tgl::SceneManager::Get().NewScene();
+	SceneId scene_id = scene->GetId();
 	auto &data = scene->GetComponentData();
 
 	EntityId both{0, scene_id};

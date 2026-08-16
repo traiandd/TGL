@@ -13,8 +13,7 @@
 
 SceneId EmptyScene() {
 	GameManager &gm = GameManager::Get();
-	SceneId scene_id = gm.AddScene(Scene());
-	Scene *scene = gm.GetScene(scene_id);
+	Scene *scene = &gm.NewScene();
 
 	Camera3d camera = scene->AddEntity(Camera3d::New());
 	camera.SetPosition(glm::vec3({0.f, 1.f, 0.f}));
@@ -32,5 +31,5 @@ SceneId EmptyScene() {
 	scene->AddSystem<Render3dSystem>();
 	scene->AddSystem<BatchRender3dSystem>();
 
-	return scene_id;
+	return scene->GetId();
 }

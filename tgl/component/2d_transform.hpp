@@ -3,7 +3,6 @@
 #include "glm/fwd.hpp"
 #include "glm/glm.hpp"
 #include "register_component.hpp"
-#include "component_handle.hpp"
 #include "tgl/archetype.hpp"
 #include "tgl/component/parent.hpp"
 #include "tgl/entity.hpp"
