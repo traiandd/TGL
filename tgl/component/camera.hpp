@@ -1,12 +1,11 @@
 #pragma once
 
-#include "register_component.hpp"
 #include <cstdint>
 #include "glm/glm.hpp"
 #include "tgl/archetype.hpp"
 #include "tgl/component/2d_transform.hpp"
 
-struct CameraComponent : Component {
+struct CameraComponent {
 	uint32_t width;
 	uint32_t height;
 
@@ -24,8 +23,6 @@ struct CameraComponent : Component {
 
 	glm::vec2 GetSizes() { return {width, height}; }
 };
-
-register_component(CameraComponent);
 
 template<typename Derived> class tgl::ArchetypeExtender<CameraComponent, Derived> {
 	Using(Instance);

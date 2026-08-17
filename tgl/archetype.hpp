@@ -95,3 +95,5 @@ template<typename... Components> class Archetype : public ArchetypeData, public 
 	operator EntityInstance() const { return instance_; }
 };
 } // namespace tgl
+
+#define impl(ty) template<typename Derived> class tgl::ArchetypeExtender<ty, Derived>

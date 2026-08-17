@@ -4,12 +4,11 @@
 #include "glm/fwd.hpp"
 #include "glm/geometric.hpp"
 #include "glm/glm.hpp"
-#include "register_component.hpp"
 #include "tgl/archetype.hpp"
 #include <iostream>
 #include <string>
 
-struct UITextComponent : Component {
+struct UITextComponent {
   private:
 	std::string text_ = "Hello world!";
 	glm::vec3 color_ = {1., 1., 1.};
@@ -31,8 +30,6 @@ struct UITextComponent : Component {
 	}
 	glm::vec3 GetTextColor() { return color_; }
 };
-
-register_component(UITextComponent);
 
 template<typename Derived> class tgl::ArchetypeExtender<UITextComponent, Derived> {
 	Using(Instance);

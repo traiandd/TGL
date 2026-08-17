@@ -1,11 +1,7 @@
 #pragma once
 
 #include <optional>
-#include <unordered_map>
-#include <typeindex>
-#include <memory>
 #include <utility>
-#include "component/component.hpp"
 #include "tgl/component_data.hpp"
 #include "entity_id.hpp"
 
@@ -38,29 +34,5 @@ class EntityInstance {
 
   private:
 	EntityId id_;
-};
-
-class Entity {
-  public:
-	template<typename T> T *AddComponent(T component) {
-		std::type_index type = typeid(T);
-		auto it = m_components.find(type);
-		if (it == m_components.end()) {
-			m_components[type] = std::make_unique<T>(std::move(component));
-		}
-		return static_cast<T *>(m_components[type].get());
-	}
-
-	template<typename T> T *AddComponent() { return AddComponent(T()); }
-	template<typename T> T *Get() {
-		std::type_index type = typeid(T);
-
-		return static_cast<T *>(m_components[type].get());
-	}
-
-	std::unordered_map<std::type_index, std::unique_ptr<Component>> &GetComponents() { return m_components; }
-
-  private:
-	std::unordered_map<std::type_index, std::unique_ptr<Component>> m_components;
 };
 } // namespace tgl

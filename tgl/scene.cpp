@@ -18,23 +18,6 @@ ComponentData &tgl::Scene::GetComponentData() { return m_data; }
 
 void tgl::Scene::Update(float dt) {}
 
-EntityInstance tgl::Scene::AddEntity(Entity &&entity) {
-	// cout << "Adding entity\n";
-	EntityId id = {m_next_entity_id++, id_};
-	auto &components = entity.GetComponents();
-	// cout << "Got entity components\n";
-
-	for (auto &[type, component] : components) {
-		// cout << "TYPE: " << type.name() << "\n";
-
-		auto AddComponent = component_registry[type];
-		AddComponent(m_data, id, component.get());
-	}
-	// cout << "Entity instance done?: " << "\n";
-
-	return EntityInstance(id);
-}
-
 void tgl::Scene::DeleteEntity(EntityInstance i) { m_delete_queue.push(i); }
 
 void tgl::Scene::FlushDeleteQueue() {

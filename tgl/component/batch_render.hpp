@@ -1,12 +1,10 @@
 #pragma once
 
-#include "register_component.hpp"
 #include "core/gpu/mesh.h"
-#include "component.hpp"
 #include "tgl/archetype.hpp"
 #include <string>
 
-struct BatchRenderComponent : public Component {
+struct BatchRenderComponent {
 	Mesh *mesh;
 	std::string shader = "VertexColor";
 
@@ -18,8 +16,6 @@ struct BatchRenderComponent : public Component {
 
 	std::string GetShader() { return shader; }
 };
-
-register_component(BatchRenderComponent);
 
 template<typename Derived> class tgl::ArchetypeExtender<BatchRenderComponent, Derived> {
 	Using(Instance);

@@ -1,13 +1,11 @@
 #pragma once
 #include "glm/ext/matrix_clip_space.hpp"
 #include "glm/glm.hpp"
-#include "register_component.hpp"
-#include "component.hpp"
 #include "tgl/entity.hpp"
 #include "utils/math_utils.h"
 #include "tgl/archetype.hpp"
 
-class Camera3dComponent : public Component {
+class Camera3dComponent {
   public:
 	glm::ivec2 m_dim;
 	Camera3dComponent() = default;
@@ -17,8 +15,6 @@ class Camera3dComponent : public Component {
 
 	glm::ivec2 GetSizes() { return m_dim; }
 };
-
-register_component(Camera3dComponent);
 
 template<typename Derived> class tgl::ArchetypeExtender<Camera3dComponent, Derived> {
 	Using(Self(Camera3dComponent));

@@ -4,7 +4,7 @@
 #include "core/window/window_object.h"
 #include "entity.hpp"
 #include "system/system.hpp"
-#include "tgl/component/register_component.hpp"
+#include "tgl/entity_builder.hpp"
 #include "tgl/entity_id.hpp"
 #include "tgl/observer.hpp"
 #include "tgl/prefab/camera_3d.hpp"
@@ -46,25 +46,21 @@ class Scene {
 
 	void Update(float dt);
 
-	EntityInstance AddEntity(Entity &&entity);
-
-	template<typename T, typename... Args> T AddEntity(Entity &&entity, Args... args) {
+	// Commits a builder's accumulated components straight into their final
+	// ArchetypeTable (see ComponentData::CreateEntity) and returns a view
+	// over the exact component set the builder was typed with.
+	template<typename... Components> Archetype<Components...> AddEntity(EntityBuilder<Components...> &&builder) {
 		EntityId id = {m_next_entity_id++, id_};
-		auto &components = entity.GetComponents();
-		for (auto &[type, component] : components) {
-			auto AddComponent = component_registry[type];
-			AddComponent(m_data, id, component.get());
-		}
-		return T(EntityInstance(id), args...);
+		std::apply([&](Components &...comps) { m_data.CreateEntity(id, std::move(comps)...); }, builder.Data());
+		return Archetype<Components...>(EntityInstance(id));
 	}
 
-	template<typename T> T AddEntity(Entity &&entity) {
+	// Same commit, but for prefab wrapper types (e.g. Camera3d) that extend
+	// an Archetype<...> with extra behavior - T must be given explicitly
+	// since it can't be deduced from the builder alone.
+	template<typename T, typename... Components> T AddEntity(EntityBuilder<Components...> &&builder) {
 		EntityId id = {m_next_entity_id++, id_};
-		auto &components = entity.GetComponents();
-		for (auto &[type, component] : components) {
-			auto AddComponent = component_registry[type];
-			AddComponent(m_data, id, component.get());
-		}
+		std::apply([&](Components &...comps) { m_data.CreateEntity(id, std::move(comps)...); }, builder.Data());
 		return T(EntityInstance(id));
 	}
 

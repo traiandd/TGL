@@ -1,7 +1,6 @@
 #pragma once
 #include "glm/fwd.hpp"
 #include "glm/glm.hpp"
-#include "register_component.hpp"
 #include "../entity.hpp"
 #include "../observer.hpp"
 #include "../scene.hpp"
@@ -43,8 +42,6 @@ struct UIButton : Component {
 	glm::vec2 GetDimension() { return m_dim; }
 	glm::vec2 GetOffset() { return m_dim; }
 };
-
-register_component(UIButton);
 
 template<typename Derived> class tgl::ArchetypeExtender<UIButton, Derived> {
 	Using(Self(UIButton));

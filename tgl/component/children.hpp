@@ -1,5 +1,4 @@
 #pragma once
-#include "register_component.hpp"
 #include "../entity.hpp"
 #include "tgl/archetype.hpp"
 #include "tgl/component/on_delete.hpp"
@@ -7,15 +6,13 @@
 
 #include <set>
 
-struct Children : Component {
+struct Children {
 	std::set<tgl::EntityInstance> m_child_entities;
 
 	Children() = default;
 
 	std::set<tgl::EntityInstance> &GetChildren() { return m_child_entities; }
 };
-
-register_component(Children);
 
 template<typename Derived> class tgl::ArchetypeExtender<Children, Derived> {
 	Using(Instance);

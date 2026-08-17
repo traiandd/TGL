@@ -192,6 +192,23 @@ class ComponentData {
 		rec = {new_table, new_row};
 	}
 
+	// Inserts a brand-new entity with its full component set known up front,
+	// straight into its final ArchetypeTable - unlike AddComponent, which
+	// transitions one table per call, this never touches an intermediate
+	// table. Only valid for an entity id that has no existing record.
+	template<typename... Components> void CreateEntity(tgl::EntityId e, Components... components) {
+		tgl::LocalEntityId id = e.id;
+		if (id >= entity_index.size())
+			entity_index.resize(id + 1);
+
+		Signature sig = MakeSignature<Components...>();
+		ArchetypeTable *table = GetOrCreateTable(sig);
+		(table->template EnsureColumn<Components>(), ...);
+		(table->template GetColumn<Components>()->PushBack(std::move(components)), ...);
+		size_t row = table->AppendEntity(id);
+		entity_index[id] = {table, row};
+	}
+
 	template<typename T> void RemoveComponent(tgl::EntityId e) {
 		tgl::LocalEntityId id = e.id;
 		if (id >= entity_index.size())

@@ -25,6 +25,19 @@ include(${TGL_ROOT_DIR}/infra/utils.cmake)
 custom_set_build_type()
 
 
+# Enable Link-Time Optimization for optimized (non-Debug) configs. This
+# matters specifically because a lot of tgl/'s small accessors (e.g.
+# EntityInstance::GetScene()/GetSceneData()) are declared in one header but
+# *defined* out-of-line in a .cpp - per-translation-unit compilation can't
+# inline through that boundary or see it's safe to merge repeated calls;
+# LTO is what makes those bodies visible across TUs at optimization time.
+include(CheckIPOSupported)
+check_ipo_supported(RESULT TGL_IPO_SUPPORTED OUTPUT TGL_IPO_ERROR)
+if (NOT TGL_IPO_SUPPORTED)
+    message(WARNING "LTO/IPO not supported by this toolchain: ${TGL_IPO_ERROR}")
+endif()
+
+
 # Fix to hide a bug in CMake. Hopefully able to be removed in the future.
 set(CMAKE_POLICY_DEFAULT_CMP0012 NEW)
 
@@ -98,6 +111,11 @@ custom_add_executable(${target_name}
     ${TGL_SOURCES}
     ${TGL_HEADERS_PRIVATE}
 )
+if (TGL_IPO_SUPPORTED)
+    set_target_properties(${target_name} PROPERTIES
+        INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE
+        INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE)
+endif()
 
 
 # Detect architecture
@@ -280,6 +298,11 @@ if (TGL_BUILD_TESTS)
     )
     target_include_directories(tgl_tests PRIVATE ${TGL_INCLUDE_DIRS_PRIVATE})
     target_compile_definitions(tgl_tests PRIVATE ${TGL_CXX_DEFS})
+    if (TGL_IPO_SUPPORTED)
+        set_target_properties(tgl_tests PROPERTIES
+            INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE
+            INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE)
+    endif()
 
     enable_testing()
     add_test(NAME tgl_tests COMMAND tgl_tests)
@@ -295,4 +318,9 @@ if (TGL_BUILD_BENCHMARKS)
     )
     target_include_directories(tgl_bench PRIVATE ${TGL_INCLUDE_DIRS_PRIVATE})
     target_compile_definitions(tgl_bench PRIVATE ${TGL_CXX_DEFS})
+    if (TGL_IPO_SUPPORTED)
+        set_target_properties(tgl_bench PROPERTIES
+            INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE
+            INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE)
+    endif()
 endif()

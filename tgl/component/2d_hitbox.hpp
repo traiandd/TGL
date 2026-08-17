@@ -1,7 +1,6 @@
 #pragma once
 #include "glm/fwd.hpp"
 #include "glm/glm.hpp"
-#include "register_component.hpp"
 #include "../entity.hpp"
 #include "../observer.hpp"
 #include "../game_manager.hpp"
@@ -22,7 +21,7 @@ struct HitboxCollideEvent {
 	HitboxCollideEvent(tgl::Scene *scene, tgl::EntityInstance target, tgl::EntityInstance other) : scene(scene), target(target), other(other) {}
 };
 
-struct Hitbox2d : Component {
+struct Hitbox2d {
 	glm::vec2 m_dim = glm::vec2(0.f);
 	glm::vec2 m_offset = glm::vec2(0.f);
 
@@ -35,5 +34,3 @@ struct Hitbox2d : Component {
 
 	glm::vec2 GetDimension() { return m_dim; }
 };
-
-register_component(Hitbox2d);

@@ -2,13 +2,12 @@
 
 #include "glm/fwd.hpp"
 #include "glm/glm.hpp"
-#include "register_component.hpp"
 #include "tgl/archetype.hpp"
 #include "tgl/component/parent.hpp"
 #include "tgl/entity.hpp"
 #include "parent.hpp"
 
-struct Transform2dComponent : Component {
+struct Transform2dComponent {
 	glm::mat3 transform;
 	float z = 0;
 	Transform2dComponent() : transform(glm::mat3(1)) {};
@@ -58,8 +57,6 @@ struct Transform2dComponent : Component {
 
 	glm::vec2 GetPosition() { return {transform[2][0], transform[2][1]}; }
 };
-
-register_component(Transform2dComponent);
 
 template<typename Derived> class tgl::ArchetypeExtender<Transform2dComponent, Derived> {
 	Using(Instance);

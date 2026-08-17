@@ -1,11 +1,9 @@
 #pragma once
 
 #include "core/gpu/mesh.h"
-#include "component.hpp"
-#include "register_component.hpp"
 #include "tgl/archetype.hpp"
 
-struct UIRenderComponent : public Component {
+struct UIRenderComponent {
 	Mesh *mesh;
 	std::string shader = "VertexColor";
 
@@ -17,8 +15,6 @@ struct UIRenderComponent : public Component {
 
 	std::string GetShader() { return shader; }
 };
-
-register_component(UIRenderComponent);
 
 template<typename Derived> class tgl::ArchetypeExtender<UIRenderComponent, Derived> {
 	Using(Instance);

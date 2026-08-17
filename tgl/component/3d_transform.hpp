@@ -5,13 +5,12 @@
 #include "glm/geometric.hpp"
 #include "glm/glm.hpp"
 #include "glm/gtx/euler_angles.hpp"
-#include "register_component.hpp"
 #include "tgl/entity.hpp"
 #include "parent.hpp"
 #include "tgl/archetype.hpp"
 #include <iostream>
 
-struct Transform3dComponent : Component {
+struct Transform3dComponent {
   private:
 	glm::vec3 position = glm::vec3(0.f);
 	glm::vec3 rotation = glm::vec3(0.f);
@@ -84,9 +83,7 @@ struct Transform3dComponent : Component {
 	glm::vec3 GetPosition() { return position; }
 };
 
-register_component(Transform3dComponent);
-
-template<typename Derived> class tgl::ArchetypeExtender<Transform3dComponent, Derived> {
+impl(Transform3dComponent) {
 	Using(Instance);
 	Using(Self(Transform3dComponent));
 

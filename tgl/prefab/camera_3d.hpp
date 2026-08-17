@@ -6,6 +6,7 @@
 #include "tgl/component/3d_transform.hpp"
 #include "tgl/component_data.hpp"
 #include "tgl/entity.hpp"
+#include "tgl/entity_builder.hpp"
 #include "tgl/archetype.hpp"
 #include "utils/glm_utils.h"
 #include <iostream>
@@ -42,10 +43,7 @@ class Camera3d : public Archetype<Transform3dComponent, Camera3dComponent> {
 	}
 	glm::mat4 ViewMatrix() { return glm::lookAt(GetPosition(), GetPosition() + Forward(), Up()); }
 
-	static tgl::Entity New() {
-		tgl::Entity c;
-		c.AddComponent<Transform3dComponent>();
-		c.AddComponent<Camera3dComponent>({glm::ivec2(1280, 720)});
-		return c;
+	static tgl::EntityBuilder<Transform3dComponent, Camera3dComponent> New() {
+		return tgl::EntityBuilder<>().Add<Transform3dComponent>().Add<Camera3dComponent>(glm::ivec2(1280, 720));
 	}
 };
