@@ -91,16 +91,24 @@ TEST_CASE("ComponentData keeps distinct component types independent across arche
 	CHECK(data.GetComponent<Velocity>(e)->dx == 3);
 }
 
-TEST_CASE("ComponentData::RemoveEntityData clears every component type for that entity only") {
-	ComponentData data;
-	EntityId e0{0, 1};
-	EntityId e1{1, 1};
+TEST_CASE("Scene::FlushDeleteQueue clears every component type for that entity only") {
+	// RemoveEntityData is private to ComponentData (only tgl::Scene may call
+	// it, and only from FlushDeleteQueue - see component_data.hpp) so this
+	// goes through the real queue-then-flush path instead of calling it
+	// directly.
+	tgl::Scene *scene = &tgl::SceneManager::Get().NewScene();
+	SceneId scene_id = scene->GetId();
+	auto &data = scene->GetComponentData();
+
+	EntityId e0{0, scene_id};
+	EntityId e1{1, scene_id};
 
 	data.AddComponent(e0, Position{1, 2});
 	data.AddComponent(e0, Velocity{3, 4});
 	data.AddComponent(e1, Position{5, 6});
 
-	data.RemoveEntityData(e0);
+	scene->DeleteEntity(tgl::EntityInstance(e0));
+	scene->FlushDeleteQueue();
 
 	CHECK(data.GetComponent<Position>(e0) == nullptr);
 	CHECK(data.GetComponent<Velocity>(e0) == nullptr);
@@ -207,9 +215,8 @@ TEST_CASE("ComponentData::ForEach<T>'s Archetype exposes the actual component va
 	int visits = 0;
 	data.ForEach<Position>([&](tgl::Archetype<Position> entity) {
 		visits++;
-		REQUIRE(entity.Get<Position>() != nullptr);
-		CHECK(entity.Get<Position>()->x == 7);
-		CHECK(entity.Get<Position>()->y == 8);
+		CHECK(entity.Get<Position>().x == 7);
+		CHECK(entity.Get<Position>().y == 8);
 	});
 	CHECK(visits == 1);
 }

@@ -34,6 +34,15 @@ template<typename... Components> class EntityBuilder {
 		return EntityBuilder<Components..., T>(std::tuple_cat(std::move(data_), std::make_tuple(std::move(value))));
 	}
 
+	// Only meaningful on a builder you still hold - & qualified so it can't
+	// be called on a temporary and hand back a reference into storage that's
+	// about to be destroyed.
+	template<typename T>
+		requires entity_builder_detail::kIsOneOf<T, Components...>
+	T &Get() & {
+		return std::get<T>(data_);
+	}
+
 	std::tuple<Components...> &Data() { return data_; }
 
   private:

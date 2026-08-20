@@ -14,6 +14,7 @@
 namespace tgl {
 
 class EntityInstance;
+class Scene;
 template<typename... Components> class Archetype;
 }; // namespace tgl
 
@@ -47,6 +48,7 @@ template<typename... Components> Signature MakeSignature() {
 // table's real columns (its signature already records which are populated)
 // rather than scanning the full column array.
 template<typename Func> void ForEachSetBit(Signature sig, Func f) {
+	static_assert(kMaxComponentTypes <= 64);
 	unsigned long long bits = sig.to_ullong();
 	while (bits) {
 		f(static_cast<size_t>(std::countr_zero(bits)));
@@ -156,8 +158,7 @@ class ComponentData {
 
 	template<typename T> void AddComponent(tgl::EntityId e, T component) {
 		tgl::LocalEntityId id = e.id;
-		if (id >= entity_index.size())
-			entity_index.resize(id + 1);
+		EnsureEntityIndexCapacity(id);
 
 		EntityRecord &rec = entity_index[id];
 		ArchetypeTable *old_table = rec.table;
@@ -198,8 +199,7 @@ class ComponentData {
 	// table. Only valid for an entity id that has no existing record.
 	template<typename... Components> void CreateEntity(tgl::EntityId e, Components... components) {
 		tgl::LocalEntityId id = e.id;
-		if (id >= entity_index.size())
-			entity_index.resize(id + 1);
+		EnsureEntityIndexCapacity(id);
 
 		Signature sig = MakeSignature<Components...>();
 		ArchetypeTable *table = GetOrCreateTable(sig);
@@ -211,7 +211,7 @@ class ComponentData {
 
 	template<typename T> void RemoveComponent(tgl::EntityId e) {
 		tgl::LocalEntityId id = e.id;
-		if (id >= entity_index.size())
+		if (id >= entity_index_size_)
 			return;
 
 		EntityRecord &rec = entity_index[id];
@@ -238,25 +238,9 @@ class ComponentData {
 		rec = {new_table, new_row};
 	}
 
-	void RemoveEntityData(tgl::EntityId e) {
-		tgl::LocalEntityId id = e.id;
-		if (id >= entity_index.size())
-			return;
-
-		EntityRecord &rec = entity_index[id];
-		if (!rec.table)
-			return;
-
-		auto moved = rec.table->RemoveRow(rec.row);
-		if (moved)
-			entity_index[*moved] = {rec.table, rec.row};
-
-		rec = EntityRecord{};
-	}
-
 	template<typename T> T *GetComponent(tgl::EntityId e) const {
 		tgl::LocalEntityId id = e.id;
-		if (id >= entity_index.size())
+		if (id >= entity_index_size_)
 			return nullptr;
 
 		const EntityRecord &rec = entity_index[id];
@@ -273,7 +257,7 @@ class ComponentData {
 	// component.
 	template<typename... Components> bool HasComponents(tgl::EntityId e) const {
 		tgl::LocalEntityId id = e.id;
-		if (id >= entity_index.size())
+		if (id >= entity_index_size_)
 			return false;
 
 		const EntityRecord &rec = entity_index[id];
@@ -302,14 +286,51 @@ class ComponentData {
 	size_t size() { return tables.size(); }
 
   private:
+	// Not public: destroying an entity's row mid-frame (e.g. from inside a
+	// ForEach callback) can swap another entity into the current row and
+	// desync that ForEach's iteration (see ForEach's row < table->Size()
+	// loop above). Scene::DeleteEntity queues instead, and
+	// Scene::FlushDeleteQueue - the only caller of this - runs once per
+	// frame, after systems have finished iterating.
+	friend class tgl::Scene;
+
+	void RemoveEntityData(tgl::EntityId e) {
+		tgl::LocalEntityId id = e.id;
+		if (id >= entity_index_size_)
+			return;
+
+		EntityRecord &rec = entity_index[id];
+		if (!rec.table)
+			return;
+
+		auto moved = rec.table->RemoveRow(rec.row);
+		if (moved)
+			entity_index[*moved] = {rec.table, rec.row};
+
+		rec = EntityRecord{};
+	}
+
 	struct EntityRecord {
 		ArchetypeTable *table = nullptr;
 		size_t row = 0;
 	};
 
 	SceneId scene_id = 0;
+	// Mirrors entity_index.size() - std::vector<T>::size() computes
+	// (end-begin)/sizeof(T) on every call (visible as extra load+sub+shr in
+	// GetComponent's disassembly); every bounds check here instead reads
+	// this directly, and only EnsureEntityIndexCapacity (the sole place
+	// entity_index grows) needs to keep it in sync.
+	size_t entity_index_size_ = 0;
 	std::vector<EntityRecord> entity_index;
 	std::vector<std::unique_ptr<ArchetypeTable>> tables;
+
+	void EnsureEntityIndexCapacity(tgl::LocalEntityId id) {
+		if (id >= entity_index_size_) {
+			entity_index.resize(id + 1);
+			entity_index_size_ = id + 1;
+		}
+	}
 
 	ArchetypeTable *GetOrCreateTable(Signature sig) {
 		for (auto &table : tables)

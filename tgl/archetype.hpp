@@ -89,8 +89,8 @@ template<typename... Components> class Archetype : public ArchetypeData, public 
 
 	template<typename T>
 		requires archetype_detail::kIsOneOf<T, Components...>
-	T *Get() const {
-		return instance_.Get<T>();
+	T &Get() const {
+		return *instance_.Get<T>();
 	}
 	operator EntityInstance() const { return instance_; }
 };

@@ -13,7 +13,7 @@
 #include <iostream>
 using namespace tgl;
 
-void RenderMesh3D(Camera3d &camera, Mesh *mesh, Shader *shader, const glm::mat4 &modelMatrix) {
+inline void RenderMesh3D(Camera3d &camera, Mesh *mesh, Shader *shader, const glm::mat4 &modelMatrix) {
 	if (!mesh || !shader || !shader->program)
 		return;
 
@@ -44,13 +44,11 @@ class Render3dSystem : public System {
 		auto &cam = cam_opt.value();
 
 		// World
-		data.ForEach<RenderComponent>([&cam](Archetype<RenderComponent> entity) {
+		data.ForEach<Transform3dComponent, RenderComponent>([&cam](Archetype<Transform3dComponent, RenderComponent> entity) {
 			if (!entity.GetMesh())
 				return;
-			auto transformComponent = entity.instance_.TryArche<Transform3dComponent>();
-			if (!transformComponent)
-				return;
-			glm::mat4 model_matrix = transformComponent->GlobalTransform();
+
+			glm::mat4 model_matrix = entity.GlobalTransform();
 
 			GameManager &gm = GameManager::Get();
 			RenderMesh3D(cam, entity.GetMesh(), gm.shaders[entity.GetShader()], model_matrix);

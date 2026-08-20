@@ -30,7 +30,6 @@ SceneId EmptyScene() {
 	scene->AddEntity(std::move(cube));
 
 	scene->AddSystem<Render3dSystem>();
-	scene->AddSystem<BatchRender3dSystem>();
 
 	return scene->GetId();
 }

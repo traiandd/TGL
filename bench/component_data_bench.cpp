@@ -98,7 +98,7 @@ template<typename Data> void RunAddComponent(ankerl::nanobench::Bench &bench, co
 template<typename Data> void RunForEach(ankerl::nanobench::Bench &bench, const char *name, Data &data) {
 	bench.run(name, [&] {
 		float sum = 0;
-		data.template ForEach<Position>([&](tgl::Archetype<Position> entity) { sum += entity.Get<Position>()->x; });
+		data.template ForEach<Position>([&](tgl::Archetype<Position> entity) { sum += entity.Get<Position>().x; });
 		ankerl::nanobench::doNotOptimizeAway(sum);
 	});
 }
@@ -108,7 +108,7 @@ template<typename Data> void RunForEach(ankerl::nanobench::Bench &bench, const c
 template<typename Data> void RunForEachTwoNative(ankerl::nanobench::Bench &bench, const char *name, Data &data) {
 	bench.run(name, [&] {
 		float sum = 0;
-		data.template ForEach<Position, Velocity>([&](tgl::Archetype<Position, Velocity> entity) { sum += entity.Get<Position>()->x + entity.Get<Velocity>()->dx; });
+		data.template ForEach<Position, Velocity>([&](tgl::Archetype<Position, Velocity> entity) { sum += entity.Get<Position>().x + entity.Get<Velocity>().dx; });
 		ankerl::nanobench::doNotOptimizeAway(sum);
 	});
 }
@@ -124,7 +124,7 @@ template<typename Data> void RunForEachTwoManual(ankerl::nanobench::Bench &bench
 		data.template ForEach<Position>([&](tgl::Archetype<Position> entity) {
 			tgl::EntityId id = static_cast<tgl::EntityInstance>(entity).GetId();
 			if (Velocity *vel = data.template GetComponent<Velocity>(id))
-				sum += entity.Get<Position>()->x + vel->dx;
+				sum += entity.Get<Position>().x + vel->dx;
 		});
 		ankerl::nanobench::doNotOptimizeAway(sum);
 	});
