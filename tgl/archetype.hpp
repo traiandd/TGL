@@ -47,8 +47,15 @@ namespace tgl {
 
 class ArchetypeData {
   public:
-	ArchetypeData(EntityInstance instance) : instance_(instance) {}
+	// Resolves and caches instance's table+row once here, instead of each
+	// Get<T>() re-deriving them - which would mean re-resolving the entity's
+	// Scene through SceneManager once per component queried, not once per
+	// entity (see ComponentData::Locate).
+	ArchetypeData(EntityInstance instance) : instance_(instance), location_(instance_.GetSceneData().Locate(instance_.GetId())) {}
 	EntityInstance instance_;
+
+  protected:
+	ComponentData::EntityLocation location_;
 };
 
 template<typename T, typename Derived> class ArchetypeExtender;
@@ -90,7 +97,7 @@ template<typename... Components> class Archetype : public ArchetypeData, public 
 	template<typename T>
 		requires archetype_detail::kIsOneOf<T, Components...>
 	T &Get() const {
-		return *instance_.Get<T>();
+		return *location_.table->template GetColumn<T>()->Get(location_.row);
 	}
 	operator EntityInstance() const { return instance_; }
 };

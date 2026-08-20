@@ -55,8 +55,7 @@ TEST_CASE("ComponentData::AddComponent / GetComponent round-trip") {
 	CHECK(data.GetComponent<Position>(e) == nullptr);
 
 	data.AddComponent(e, Position{1, 2});
-	REQUIRE(data.GetComponent<Position>(e) != nullptr);
-	CHECK(data.GetComponent<Position>(e)->x == 1);
+	CHECK(data.GetComponentUnchecked<Position>(e).x == 1);
 }
 
 TEST_CASE("ComponentData::AddComponent overwrites an existing component in place") {

@@ -27,10 +27,21 @@ using Signature = std::bitset<kMaxComponentTypes>;
 
 namespace component_data_detail {
 inline size_t nextTypeId = 0;
-template<typename T> size_t TypeId() {
-	static size_t id = nextTypeId++;
-	return id;
-}
+
+// Assigned eagerly, once, at program startup - an inline variable template
+// initializes via ordinary static initialization rather than a
+// lazily-guarded function-local static ("magic static"), so reading it is a
+// bare load with no runtime guard check. The trade: unlike a magic static,
+// nothing protects a read that happens before this specific slot's own
+// initializer has run - if some other global's constructor reached
+// TypeId<T>() during static init, before T's slot initialized (init order
+// across translation units is unspecified), it would silently read 0
+// instead of the real id. Nothing in this engine touches ComponentData
+// from global constructors today; keep it that way.
+template<typename T> inline size_t component_type_id = nextTypeId++;
+
+template<typename T> size_t TypeId() { return component_type_id<T>; }
+
 } // namespace component_data_detail
 using component_data_detail::TypeId;
 
@@ -238,6 +249,32 @@ class ComponentData {
 		rec = {new_table, new_row};
 	}
 
+	// What Locate() resolves an EntityId to - same fields as the private
+	// EntityRecord below, exposed as their own tiny type so a caller (e.g.
+	// tgl::ArchetypeData) can cache them without depending on ComponentData's
+	// private storage layout.
+	struct EntityLocation {
+		ArchetypeTable *table = nullptr;
+		size_t row = 0;
+	};
+
+	// Resolves e once to its current table+row - the same lookup
+	// GetComponent/GetComponentUnchecked repeat on every call, exposed
+	// directly so a caller doing several column lookups on the same entity
+	// (e.g. one Archetype's several Get<T>() calls) can resolve once at
+	// construction and reuse it, instead of re-deriving it - and re-resolving
+	// the entity's Scene through SceneManager - on every single T. Same
+	// contract as GetComponentUnchecked: only valid for an id whose entity is
+	// known (dynamically) to exist.
+	EntityLocation Locate(tgl::EntityId e) const {
+		tgl::LocalEntityId id = e.id;
+		assert(id < entity_index_size_);
+
+		const EntityRecord &rec = entity_index[id];
+		assert(rec.table);
+		return {rec.table, rec.row};
+	}
+
 	template<typename T> T *GetComponent(tgl::EntityId e) const {
 		tgl::LocalEntityId id = e.id;
 		if (id >= entity_index_size_)
@@ -249,6 +286,25 @@ class ComponentData {
 
 		Column<T> *col = rec.table->template GetColumn<T>();
 		return col ? col->Get(rec.row) : nullptr;
+	}
+
+	// Skips every check GetComponent has to make, on the assumption that the
+	// caller already knows e currently has T - true for any Archetype<...>
+	// obtained through ForEach, whose own signature-vs-query check is what
+	// establishes the guarantee (see ForEach below). Not for general use: an
+	// id that was never created, or an entity missing T, is UB here instead
+	// of a graceful nullptr - the asserts catch that in debug builds, but
+	// NDEBUG builds trust the caller completely.
+	template<typename T> T &GetComponentUnchecked(tgl::EntityId e) const {
+		tgl::LocalEntityId id = e.id;
+		assert(id < entity_index_size_);
+
+		const EntityRecord &rec = entity_index[id];
+		assert(rec.table);
+
+		Column<T> *col = rec.table->template GetColumn<T>();
+		assert(col);
+		return *col->Get(rec.row);
 	}
 
 	// Whether e's archetype table contains ALL of Components - a single

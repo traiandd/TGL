@@ -315,6 +315,7 @@ if (TGL_BUILD_BENCHMARKS)
         ${TGL_ROOT_DIR}/tgl/scene.cpp
         ${TGL_ROOT_DIR}/tgl/scene_manager.cpp
         ${TGL_ROOT_DIR}/bench/component_data_bench.cpp
+        ${TGL_ROOT_DIR}/deps/api/flecs/flecs.c
     )
     target_include_directories(tgl_bench PRIVATE ${TGL_INCLUDE_DIRS_PRIVATE})
     target_compile_definitions(tgl_bench PRIVATE ${TGL_CXX_DEFS})

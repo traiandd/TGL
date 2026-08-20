@@ -5,7 +5,6 @@
 #include "../observer.hpp"
 #include "../game_manager.hpp"
 #include "tgl/component_data.hpp"
-#include <set>
 
 namespace tgl {
 class Scene; // forward declaration
