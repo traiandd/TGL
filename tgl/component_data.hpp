@@ -42,17 +42,25 @@ template<typename T> inline size_t component_type_id = nextTypeId++;
 
 template<typename T> size_t TypeId() { return component_type_id<T>; }
 
+// Same eager-inline-variable-template trick as component_type_id above,
+// applied to MakeSignature's own cached result below - this used to be a
+// function-local static ("magic static"), guard-checked on every single
+// call to MakeSignature (and so every call to ForEach/HasComponents/etc,
+// not just the first). A real game calls ForEach<T>() fresh every frame per
+// system, so that guard check paid its cost every frame, forever, for a
+// value that's only ever computed once. Same caveat as component_type_id:
+// a read before this specific pack's own initializer has run would
+// silently get an all-zero Signature instead of the real one.
+template<typename... Components> inline Signature signature_for = [] {
+	Signature s;
+	(s.set(TypeId<Components>()), ...);
+	return s;
+}();
+
 } // namespace component_data_detail
 using component_data_detail::TypeId;
 
-template<typename... Components> Signature MakeSignature() {
-	static Signature sig = [] {
-		Signature s;
-		(s.set(TypeId<Components>()), ...);
-		return s;
-	}();
-	return sig;
-}
+template<typename... Components> Signature MakeSignature() { return component_data_detail::signature_for<Components...>; }
 
 // Calls f(index) for every set bit in sig, jumping straight to each one
 // instead of testing all kMaxComponentTypes bits - used to walk exactly a
@@ -332,8 +340,25 @@ class ComponentData {
 		for (auto &table : tables) {
 			if ((table->GetSignature() & query) != query)
 				continue;
-			for (size_t row = 0; row < table->Size(); row++)
-				f(tgl::Archetype<Components...>(tgl::EntityId(table->EntityAt(row), scene_id)));
+
+			ArchetypeTable *t = table.get();
+			size_t size = t->Size();
+			size_t row = 0;
+
+			// Manually unrolled: the per-row loop overhead (increment,
+			// compare, branch) is paid once per kUnroll rows instead of once
+			// per row for the bulk of the table - a compile-time-constant
+			// trip count here (not a runtime one) so the compiler can fully
+			// unroll this inner block into straight-line code, regardless of
+			// how large the surrounding function is. Falls back to a plain
+			// scalar loop for whatever doesn't fill a full block of kUnroll.
+			constexpr size_t kUnroll = 16;
+			for (; row + kUnroll <= size; row += kUnroll) {
+				for (size_t k = 0; k < kUnroll; k++)
+					f(tgl::Archetype<Components...>(tgl::EntityId(t->EntityAt(row + k), scene_id), t, row + k));
+			}
+			for (; row < size; row++)
+				f(tgl::Archetype<Components...>(tgl::EntityId(t->EntityAt(row), scene_id), t, row));
 		}
 	}
 

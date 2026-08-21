@@ -515,6 +515,19 @@ void RunGetComponentGaia(ankerl::nanobench::Bench &bench, const char *name) {
 // Scene registered through SceneManager - Archetype<T>'s constructor always
 // validates through that Scene, regardless of which ComponentData
 // implementation's storage ForEach is walking. See main()'s ForEach block.
+//
+// Caveat versus RunForEachGaia below: gaia's Query is built once, outside
+// bench.run - its archetype-matching is resolved and cached up front, so
+// q.each() only pays for iteration. ComponentData::ForEach re-scans every
+// table in tables (see component_data.hpp) on every single call inside this
+// timed loop, matching against Components fresh each time - there's no
+// equivalent up-front caching on this side. That scan is free in this
+// specific benchmark (Populate() puts every entity into the one shared
+// archetype, so there's exactly one table to check), but it scales with the
+// number of distinct archetypes in the ComponentData, not with what's
+// actually being iterated - the same "table fragmentation" cost the Heavy
+// benchmark's own comments flag elsewhere in this file. With many
+// archetypes and a narrow query, this comparison would no longer be fair.
 template<typename Data> void RunForEach(ankerl::nanobench::Bench &bench, const char *name, Data &data) {
 	bench.run(name, [&] {
 		float sum = 0;
@@ -523,13 +536,32 @@ template<typename Data> void RunForEach(ankerl::nanobench::Bench &bench, const c
 	});
 }
 
+// Native EnTT iteration via registry.view<T>().each() - unlike
+// bench_impl::entt_ecs::ComponentData::ForEach (used by RunForEach above for
+// current/dense_array/legacy), this doesn't reconstruct a tgl::EntityId or a
+// tgl::Archetype per entity - that translation only exists to let the
+// wrapper hand back what ComponentData::ForEach's interface promises, and
+// isn't something a real EnTT program pays for iterating its own view.
+void RunForEachEntt(ankerl::nanobench::Bench &bench, const char *name) {
+	entt::registry registry;
+	for (int i = 0; i < kEntities; i++) {
+		auto entity = registry.create();
+		registry.emplace<Position>(entity, 1.f, 2.f, 3.f);
+	}
+
+	bench.run(name, [&] {
+		float sum = 0;
+		registry.view<Position>().each([&](Position &p) { sum += p.x; });
+		ankerl::nanobench::doNotOptimizeAway(sum);
+	});
+}
+
 // Native gaia-ecs iteration via Query::each - entities are created up front
 // via the same batched copy_n() path used elsewhere in this file, outside
 // bench.run, so this measures the query/iteration itself, not entity
-// creation. Unlike the entt ForEach block below, there's no wrapper
-// reconstructing a tgl::EntityId per entity to tax the result here - gaia's
-// own Query/Iter types are exactly what a real gaia program would iterate
-// with.
+// creation. Same reasoning as RunForEachEntt above: gaia's own Query/Iter
+// types are exactly what a real gaia program would iterate with, no
+// wrapper-induced EntityId/Archetype reconstruction in between.
 void RunForEachGaia(ankerl::nanobench::Bench &bench, const char *name) {
 	gaia::ecs::World world;
 	gaia::ecs::Entity first = world.add();
@@ -542,6 +574,49 @@ void RunForEachGaia(ankerl::nanobench::Bench &bench, const char *name) {
 		float sum = 0;
 		q.each([&](const Position &p) { sum += p.x; });
 		ankerl::nanobench::doNotOptimizeAway(sum);
+	});
+}
+
+// Same population as RunForEach above, but writes to each entity's own
+// Position in place instead of summing into one shared accumulator. Every
+// addss in RunForEach's unrolled block depends on the previous one (they all
+// write the same xmm0), so its lower instruction count didn't reduce
+// wall-clock time there - floating-point add latency was already the
+// bottleneck, not instruction throughput. Writing to a different row per
+// iteration has no such cross-iteration dependency, so this isolates
+// whether the unrolled ForEach's ~4x fewer instructions actually shows up as
+// real time once the CPU isn't stuck waiting on a serial reduction chain.
+template<typename Data> void RunForEachIndependent(ankerl::nanobench::Bench &bench, const char *name, Data &data) {
+	bench.run(name, [&] {
+		data.template ForEach<Position>([&](tgl::Archetype<Position> entity) { entity.Get<Position>().x += 1.f; });
+		ankerl::nanobench::doNotOptimizeAway(data);
+	});
+}
+
+void RunForEachIndependentEntt(ankerl::nanobench::Bench &bench, const char *name) {
+	entt::registry registry;
+	for (int i = 0; i < kEntities; i++) {
+		auto entity = registry.create();
+		registry.emplace<Position>(entity, 1.f, 2.f, 3.f);
+	}
+
+	bench.run(name, [&] {
+		registry.view<Position>().each([&](Position &p) { p.x += 1.f; });
+		ankerl::nanobench::doNotOptimizeAway(registry);
+	});
+}
+
+void RunForEachIndependentGaia(ankerl::nanobench::Bench &bench, const char *name) {
+	gaia::ecs::World world;
+	gaia::ecs::Entity first = world.add();
+	world.add<Position>(first, {1, 2, 3});
+	world.copy_n(first, kEntities - 1);
+
+	gaia::ecs::Query q = world.query().all<Position &>();
+
+	bench.run(name, [&] {
+		q.each([&](Position &p) { p.x += 1.f; });
+		ankerl::nanobench::doNotOptimizeAway(world);
 	});
 }
 
@@ -663,7 +738,37 @@ int main() {
 		RunForEach(bench, "current (archetype/table storage)", current_data);
 		RunForEach(bench, "dense_array (TypeId-indexed vector)", dense_array_data);
 		RunForEach(bench, "legacy (type_index hash map)", legacy_data);
+		RunForEachEntt(bench, "entt (sparse-set ECS, v4.0.0)");
 		RunForEachGaia(bench, "gaia-ecs (archetype/chunk ECS, v0.9.2)");
+	}
+
+	{
+		// Same setup as the ForEach block above, but this one writes to each
+		// entity's own Position in place instead of summing into a shared
+		// accumulator - see RunForEachIndependent's comment for why that
+		// distinction matters for whether the unrolled ForEach's lower
+		// instruction count actually reduces wall-clock time.
+		tgl::Scene *scene = &tgl::SceneManager::Get().NewScene();
+		SceneId scene_id = scene->GetId();
+
+		auto &current_data = scene->GetComponentData();
+		Populate(current_data, scene_id);
+
+		bench_impl::dense_array::ComponentData dense_array_data;
+		dense_array_data.SetSceneId(scene_id);
+		Populate(dense_array_data, scene_id);
+
+		bench_impl::legacy::ComponentData legacy_data;
+		Populate(legacy_data, scene_id);
+
+		ankerl::nanobench::Bench bench;
+		bench.title("ForEach, independent per-entity writes (no shared accumulator)").relative(true).batch(kEntities);
+
+		RunForEachIndependent(bench, "current (archetype/table storage)", current_data);
+		RunForEachIndependent(bench, "dense_array (TypeId-indexed vector)", dense_array_data);
+		RunForEachIndependent(bench, "legacy (type_index hash map)", legacy_data);
+		RunForEachIndependentEntt(bench, "entt (sparse-set ECS, v4.0.0)");
+		RunForEachIndependentGaia(bench, "gaia-ecs (archetype/chunk ECS, v0.9.2)");
 	}
 
 	{

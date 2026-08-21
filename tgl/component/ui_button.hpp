@@ -18,7 +18,7 @@ struct UIMouseClickEvent : MouseClickEvent {
 	UIMouseClickEvent(tgl::Scene *scene, tgl::EntityId target, MouseClickEvent e) : MouseClickEvent(e), scene(scene), target(target) {}
 };
 
-struct UIButton : Component {
+struct UIButton {
 	glm::vec2 m_dim = glm::vec2(0.f);
 	glm::vec2 m_offset = glm::vec2(0.f);
 

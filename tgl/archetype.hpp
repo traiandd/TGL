@@ -52,6 +52,14 @@ class ArchetypeData {
 	// Scene through SceneManager once per component queried, not once per
 	// entity (see ComponentData::Locate).
 	ArchetypeData(EntityInstance instance) : instance_(instance), location_(instance_.GetSceneData().Locate(instance_.GetId())) {}
+
+	// Skips Locate() (and the SceneManager::Get() it goes through) entirely -
+	// for a caller that already knows exactly which table+row an entity
+	// lives in from its own loop state (see ComponentData::ForEach), instead
+	// of handing over just an EntityInstance and making this re-derive what
+	// the caller already had in hand.
+	ArchetypeData(EntityInstance instance, ArchetypeTable *table, size_t row) : instance_(instance), location_{table, row} {}
+
 	EntityInstance instance_;
 
   protected:
@@ -76,6 +84,16 @@ template<typename... Components> class Archetype : public ArchetypeData, public 
 	explicit Archetype(const EntityInstance instance) : ArchetypeData(instance) {
 		// TODO: TryFrom does the check twice. Maybe remove this instead?
 		assert(instance_.GetSceneData().template HasComponents<Components...>(instance_.GetId()));
+	}
+
+	// For a caller (ForEach) that already resolved this exact entity's
+	// table+row through its own loop - skips ArchetypeData's Locate() call,
+	// and validates the compile-time guarantee directly against the
+	// already-held table's signature instead of re-deriving it via
+	// ComponentData::HasComponents (which would mean another entity_index
+	// lookup, exactly the redundant work this constructor exists to avoid).
+	Archetype(const EntityInstance instance, ArchetypeTable *table, size_t row) : ArchetypeData(instance, table, row) {
+		assert((table->GetSignature() & MakeSignature<Components...>()) == MakeSignature<Components...>());
 	}
 
 	// Reorders another Archetype over the exact same component set - the two
