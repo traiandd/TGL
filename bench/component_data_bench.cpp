@@ -577,6 +577,23 @@ void RunForEachGaia(ankerl::nanobench::Bench &bench, const char *name) {
 	});
 }
 
+// Native flecs iteration via a flecs::query<T> built once outside bench.run
+// - same fairness convention as RunForEachGaia above: query resolution is
+// paid for up front, so q.each() only times iteration itself.
+void RunForEachFlecs(ankerl::nanobench::Bench &bench, const char *name) {
+	flecs::world world;
+	for (int i = 0; i < kEntities; i++)
+		world.entity().set<Position>({1, 2, 3});
+
+	flecs::query<Position> q = world.query<Position>();
+
+	bench.run(name, [&] {
+		float sum = 0;
+		q.each([&](Position &p) { sum += p.x; });
+		ankerl::nanobench::doNotOptimizeAway(sum);
+	});
+}
+
 // Same population as RunForEach above, but writes to each entity's own
 // Position in place instead of summing into one shared accumulator. Every
 // addss in RunForEach's unrolled block depends on the previous one (they all
@@ -620,12 +637,106 @@ void RunForEachIndependentGaia(ankerl::nanobench::Bench &bench, const char *name
 	});
 }
 
+void RunForEachIndependentFlecs(ankerl::nanobench::Bench &bench, const char *name) {
+	flecs::world world;
+	for (int i = 0; i < kEntities; i++)
+		world.entity().set<Position>({1, 2, 3});
+
+	flecs::query<Position> q = world.query<Position>();
+
+	bench.run(name, [&] {
+		q.each([&](Position &p) { p.x += 1.f; });
+		ankerl::nanobench::doNotOptimizeAway(world);
+	});
+}
+
 // current has real multi-component archetype queries: this visits only the
 // table(s) whose signature contains both Position and Velocity.
 template<typename Data> void RunForEachTwoNative(ankerl::nanobench::Bench &bench, const char *name, Data &data) {
 	bench.run(name, [&] {
 		float sum = 0;
 		data.template ForEach<Position, Velocity>([&](tgl::Archetype<Position, Velocity> entity) { sum += entity.Get<Position>().x + entity.Get<Velocity>().dx; });
+		ankerl::nanobench::doNotOptimizeAway(sum);
+	});
+}
+
+// Native EnTT two-component iteration via registry.view<Position,
+// Velocity>().each() - entt's multi-type view only visits entities owning
+// both components, its own equivalent of current's archetype query. Same
+// 50/25/25 both/Position-only/Velocity-only split as PopulateMixed, so the
+// view actually has to filter rather than match every entity.
+void RunForEachTwoEntt(ankerl::nanobench::Bench &bench, const char *name) {
+	entt::registry registry;
+	for (int i = 0; i < kEntities; i++) {
+		auto entity = registry.create();
+		int bucket = i % 4;
+		if (bucket < 2) {
+			registry.emplace<Position>(entity, 1.f, 2.f, 3.f);
+			registry.emplace<Velocity>(entity, 0.1f, 0.2f, 0.3f);
+		} else if (bucket == 2) {
+			registry.emplace<Position>(entity, 1.f, 2.f, 3.f);
+		} else {
+			registry.emplace<Velocity>(entity, 0.1f, 0.2f, 0.3f);
+		}
+	}
+
+	bench.run(name, [&] {
+		float sum = 0;
+		registry.view<Position, Velocity>().each([&](Position &p, Velocity &v) { sum += p.x + v.dx; });
+		ankerl::nanobench::doNotOptimizeAway(sum);
+	});
+}
+
+// Native flecs two-component iteration via flecs::query<Position, Velocity>,
+// built once outside bench.run - same fairness convention as RunForEachFlecs
+// above. Same 50/25/25 mixed population as RunForEachTwoEntt.
+void RunForEachTwoFlecs(ankerl::nanobench::Bench &bench, const char *name) {
+	flecs::world world;
+	for (int i = 0; i < kEntities; i++) {
+		flecs::entity entity = world.entity();
+		int bucket = i % 4;
+		if (bucket < 2) {
+			entity.set<Position>({1, 2, 3});
+			entity.set<Velocity>({0.1f, 0.2f, 0.3f});
+		} else if (bucket == 2) {
+			entity.set<Position>({1, 2, 3});
+		} else {
+			entity.set<Velocity>({0.1f, 0.2f, 0.3f});
+		}
+	}
+
+	flecs::query<Position, Velocity> q = world.query<Position, Velocity>();
+
+	bench.run(name, [&] {
+		float sum = 0;
+		q.each([&](Position &p, Velocity &v) { sum += p.x + v.dx; });
+		ankerl::nanobench::doNotOptimizeAway(sum);
+	});
+}
+
+// Native gaia-ecs two-component iteration via Query::all<Position&,
+// Velocity>(), built once outside bench.run - same fairness convention as
+// RunForEachGaia above. Same 50/25/25 mixed population as RunForEachTwoEntt.
+void RunForEachTwoGaia(ankerl::nanobench::Bench &bench, const char *name) {
+	gaia::ecs::World world;
+	for (int i = 0; i < kEntities; i++) {
+		gaia::ecs::Entity entity = world.add();
+		int bucket = i % 4;
+		if (bucket < 2) {
+			world.add<Position>(entity, {1, 2, 3});
+			world.add<Velocity>(entity, {0.1f, 0.2f, 0.3f});
+		} else if (bucket == 2) {
+			world.add<Position>(entity, {1, 2, 3});
+		} else {
+			world.add<Velocity>(entity, {0.1f, 0.2f, 0.3f});
+		}
+	}
+
+	gaia::ecs::Query q = world.query().all<Position &>().all<Velocity>();
+
+	bench.run(name, [&] {
+		float sum = 0;
+		q.each([&](Position &p, const Velocity &v) { sum += p.x + v.dx; });
 		ankerl::nanobench::doNotOptimizeAway(sum);
 	});
 }
@@ -739,6 +850,7 @@ int main() {
 		RunForEach(bench, "dense_array (TypeId-indexed vector)", dense_array_data);
 		RunForEach(bench, "legacy (type_index hash map)", legacy_data);
 		RunForEachEntt(bench, "entt (sparse-set ECS, v4.0.0)");
+		RunForEachFlecs(bench, "flecs (archetype/table ECS, v4.1.6)");
 		RunForEachGaia(bench, "gaia-ecs (archetype/chunk ECS, v0.9.2)");
 	}
 
@@ -768,6 +880,7 @@ int main() {
 		RunForEachIndependent(bench, "dense_array (TypeId-indexed vector)", dense_array_data);
 		RunForEachIndependent(bench, "legacy (type_index hash map)", legacy_data);
 		RunForEachIndependentEntt(bench, "entt (sparse-set ECS, v4.0.0)");
+		RunForEachIndependentFlecs(bench, "flecs (archetype/table ECS, v4.1.6)");
 		RunForEachIndependentGaia(bench, "gaia-ecs (archetype/chunk ECS, v0.9.2)");
 	}
 
@@ -796,5 +909,8 @@ int main() {
 		RunForEachTwoNative(bench, "current (native 2-component archetype query)", current_data);
 		RunForEachTwoManual(bench, "dense_array (ForEach<Position> + manual has-check)", dense_array_data);
 		RunForEachTwoManual(bench, "legacy (ForEach<Position> + manual has-check)", legacy_data);
+		RunForEachTwoEntt(bench, "entt (sparse-set ECS, v4.0.0)");
+		RunForEachTwoFlecs(bench, "flecs (archetype/table ECS, v4.1.6)");
+		RunForEachTwoGaia(bench, "gaia-ecs (archetype/chunk ECS, v0.9.2)");
 	}
 }
